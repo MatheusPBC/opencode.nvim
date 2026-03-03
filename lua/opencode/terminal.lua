@@ -115,6 +115,7 @@ end
 ---@param win integer
 function M.setup(win)
   local buf = vim.api.nvim_win_get_buf(win)
+  ---@type integer|nil
   local pid
 
   vim.api.nvim_create_autocmd("TermOpen", {
@@ -127,10 +128,7 @@ function M.setup(win)
       keymaps(event.buf)
       -- Cache PID eagerly at terminal open time because by the time ExitPre fires,
       -- the job has been cleared and terminal_job_id is no longer available.
-      local ok, _pid = pcall(vim.fn.jobpid, vim.b[event.buf].terminal_job_id)
-      if ok then
-        pid = _pid
-      end
+      _, pid = pcall(vim.fn.jobpid, vim.b[event.buf].terminal_job_id)
     end,
   })
 
@@ -153,14 +151,18 @@ function M.setup(win)
     buffer = buf,
     once = true,
     callback = function()
-      terminate(pid)
+      if pid then
+        terminate(pid)
+      end
     end,
   })
   -- Neovim doesn't execute TermClose when exiting, so listen for ExitPre too
   vim.api.nvim_create_autocmd("ExitPre", {
     once = true,
     callback = function()
-      terminate(pid)
+      if pid then
+        terminate(pid)
+      end
     end,
   })
 end
