@@ -26,7 +26,7 @@ vim.api.nvim_create_autocmd("User", {
       return
     end
 
-    if event.type == "permission.asked" and event.properties.permission ~= "edit" then
+    if event.type == "permission.asked" and not (event.properties.permission == "edit" and opts.edits.enabled) then
       local idle_delay_ms = opts.idle_delay_ms or 1000
       vim.notify(
         "`opencode` requested permission — awaiting idle…",
