@@ -107,6 +107,9 @@ programs.nixvim = {
 | `@marks`       | Global marks                                                    |
 | `@grapple`     | [grapple.nvim](https://github.com/cbochs/grapple.nvim) tags     |
 
+> [!TIP]
+> `opencode` reads referenced files from disk — save your changes!
+
 ### Prompts
 
 Select or reference prompts to review, explain, and improve your code:
