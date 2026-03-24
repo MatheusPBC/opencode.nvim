@@ -33,7 +33,7 @@ function M.open(cmd, opts)
   opts = opts or {}
 
   local previous_win = vim.api.nvim_get_current_win()
-  bufnr = vim.api.nvim_create_buf(true, false)
+  bufnr = vim.api.nvim_create_buf(false, false)
   winid = vim.api.nvim_open_win(bufnr, true, opts)
 
   vim.api.nvim_create_autocmd("ExitPre", {
