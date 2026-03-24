@@ -41,7 +41,7 @@ function M.toggle(cmd, opts)
   opts = vim.tbl_deep_extend("force", defaults, opts or {})
   if bufnr == nil then
     -- TODO: Check for a terminal restored from a previous session and reuse it instead
-    M.start(cmd, opts)
+    M.open(cmd, opts)
   else
     if winid ~= nil and vim.api.nvim_win_is_valid(winid) then
       -- Hide the window
@@ -57,28 +57,40 @@ function M.toggle(cmd, opts)
 end
 
 ---@param cmd string
-function M.start(cmd, opts)
+function M.open(cmd, opts)
   opts = vim.tbl_deep_extend("force", defaults, opts or {})
-  if bufnr == nil then
-    local previous_win = vim.api.nvim_get_current_win()
-    bufnr = vim.api.nvim_create_buf(true, false)
-    winid = vim.api.nvim_open_win(bufnr, true, opts)
 
-    M.setup(winid)
-
-    vim.fn.jobstart(cmd, {
-      term = true,
-      on_exit = function()
-        winid = nil
-        bufnr = nil
-      end,
-    })
-
-    vim.api.nvim_set_current_win(previous_win)
+  if bufnr ~= nil and vim.api.nvim_buf_is_valid(bufnr) then
+    return
   end
+
+  local previous_win = vim.api.nvim_get_current_win()
+  bufnr = vim.api.nvim_create_buf(true, false)
+  winid = vim.api.nvim_open_win(bufnr, true, opts)
+
+  vim.api.nvim_create_autocmd("ExitPre", {
+    once = true,
+    callback = function()
+      -- Delete the buffer so session doesn't save + restore it.
+      -- Not worth the complexity to handle a restored terminal,
+      -- and this is consistent with most other Neovim terminal plugins.
+      M.close()
+    end,
+  })
+
+  M.setup(winid)
+
+  vim.fn.jobstart(cmd, {
+    term = true,
+    on_exit = function()
+      M.close()
+    end,
+  })
+
+  vim.api.nvim_set_current_win(previous_win)
 end
 
-function M.stop()
+function M.close()
   local job_id = bufnr and vim.b[bufnr].terminal_job_id
   if job_id then
     vim.fn.jobstop(job_id)
@@ -156,6 +168,7 @@ function M.setup(win)
       end
     end,
   })
+
   -- Neovim doesn't execute TermClose when exiting, so listen for ExitPre too
   vim.api.nvim_create_autocmd("ExitPre", {
     once = true,
