@@ -240,7 +240,7 @@ M.clear_profile_project = function()
   require("opencode.profiles").clear_project_profile()
 end
 
----Get list of available profile names.
+---List available profile names.
 ---@return string[]
 M.list_profiles = function()
   return require("opencode.profiles").list_profiles()
@@ -251,6 +251,24 @@ end
 ---@return string[]
 M.get_profile_contexts = function(name)
   return require("opencode.profiles").get_contexts(name)
+end
+
+--------------------
+--- MCP Integration ---
+--------------------
+
+---Get the current Neovim RPC socket path.
+---Use this to connect external processes to Neovim's RPC interface.
+---@return string|nil The RPC socket path, or nil if not available.
+M.rpc_socket = function()
+  return require("opencode.mcp")._get_rpc_socket()
+end
+
+---Get the path to the MCP server script.
+---The script connects to Neovim's RPC socket and provides tools for OpenCode.
+---@return string Absolute path to the MCP server script.
+M.mcp_server_script = function()
+  return require("opencode.mcp").get_server_script_path()
 end
 
 ---Select and execute a slash command (from HTTP API).
