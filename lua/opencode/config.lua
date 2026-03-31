@@ -150,6 +150,7 @@ local defaults = {
       agents = true,
       skills = true,
       slash_commands = true,
+      profiles = true,
     },
     snacks = {
       preview = "preview",

@@ -26,6 +26,9 @@ local M = {}
 ---
 ---Whether to show the slash commands section (from HTTP API).
 ---@field slash_commands? boolean
+---
+---Whether to show the profiles section.
+---@field profiles? boolean
 
 ---Select from all `opencode.nvim` functionality.
 ---
@@ -146,6 +149,18 @@ function M.select(opts)
         })
       end
 
+      -- Profiles section
+      if opts.sections.profiles then
+        table.insert(items, { __group = true, name = "PROFILES", preview = { text = "" } })
+        table.insert(items, {
+          __type = "profile",
+          name = "profiles.select",
+          text = "Select a profile",
+          highlights = { { "Select a profile", "Comment" } },
+          preview = { text = "Set global or project-specific default contexts" },
+        })
+      end
+
       -- Server section
       if opts.sections.server then
         table.insert(items, { __group = true, name = "SERVER", preview = { text = "" } })
@@ -250,6 +265,8 @@ function M.select(opts)
         return require("opencode").select_skills()
       elseif choice.__type == "slash_command" then
         return require("opencode").select_commands()
+      elseif choice.__type == "profile" then
+        return require("opencode").select_profile()
       else
         return Promise.reject("Unknown item: " .. choice.name)
       end
