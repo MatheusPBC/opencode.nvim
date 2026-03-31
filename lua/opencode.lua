@@ -128,6 +128,21 @@ M.command = function(command)
   end)
 end
 
+---Execute a slash command in `opencode`.
+---Discovers the active session and executes the command via HTTP API.
+---
+---@param command string The slash command to execute (e.g., "/agents", "/new")
+---@param args? table<string, any> Arguments for the command
+---@param opts? opencode.api.slash.Opts
+---@return Promise
+M.slash = function(command, args, opts)
+  return require("opencode.api.slash").slash(command, args, opts):catch(function(err)
+    if err then
+      vim.notify(err, vim.log.levels.ERROR, { title = "opencode" })
+    end
+  end)
+end
+
 M.operator = require("opencode.api.operator").operator
 
 ----------------
@@ -167,5 +182,38 @@ end
 --------------------
 
 M.snacks_picker_send = require("opencode.integrations.pickers.snacks").send
+
+----------------------
+--- Public Pickers ---
+----------------------
+
+---Select an agent from available agents (from HTTP API).
+---Displays agent info on selection.
+M.select_agents = function()
+  return require("opencode.ui.select_agents").select():catch(function(err)
+    if err then
+      vim.notify(err, vim.log.levels.ERROR, { title = "opencode" })
+    end
+  end)
+end
+
+---Select a skill from locally discovered skills.
+---Displays skill info on selection, copies name to clipboard.
+M.select_skills = function()
+  return require("opencode.ui.select_skills").select():catch(function(err)
+    if err then
+      vim.notify(err, vim.log.levels.ERROR, { title = "opencode" })
+    end
+  end)
+end
+
+---Select and execute a slash command (from HTTP API).
+M.select_commands = function()
+  return require("opencode.ui.select_commands").select():catch(function(err)
+    if err then
+      vim.notify(err, vim.log.levels.ERROR, { title = "opencode" })
+    end
+  end)
+end
 
 return M
