@@ -144,6 +144,9 @@ local defaults = {
         ["prompt.clear"] = "Clear the current prompt",
       },
       server = true,
+      agents = true,
+      skills = true,
+      slash_commands = true,
     },
     snacks = {
       preview = "preview",
