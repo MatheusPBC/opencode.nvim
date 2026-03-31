@@ -33,6 +33,9 @@ vim.g.opencode_opts = vim.g.opencode_opts
 ---Options for the in-process LSP that interacts with `opencode`.
 ---@field lsp? opencode.lsp.Opts
 ---
+---Profiles: named sets of default contexts.
+---@field profiles? table<string, string[]> Profile name -> list of context placeholders
+
 ---Options for `opencode` event handling.
 ---@field events? opencode.events.Opts
 
@@ -177,6 +180,10 @@ local defaults = {
         enabled = true,
       },
     },
+  },
+  -- stylua: ignore
+  profiles = {
+    default = {},
   },
 }
 
