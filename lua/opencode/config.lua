@@ -48,18 +48,24 @@ local defaults = {
   server = {
     port = nil,
     start = function()
+      local mcp = require("opencode.mcp")
+      local env = mcp.has_socket() and mcp.get_env() or nil
       require("opencode.terminal").open("opencode --port", {
         split = "right",
         width = math.floor(vim.o.columns * 0.35),
+        env = env,
       })
     end,
     stop = function()
       require("opencode.terminal").close()
     end,
     toggle = function()
+      local mcp = require("opencode.mcp")
+      local env = mcp.has_socket() and mcp.get_env() or nil
       require("opencode.terminal").toggle("opencode --port", {
         split = "right",
         width = math.floor(vim.o.columns * 0.35),
+        env = env,
       })
     end,
   },

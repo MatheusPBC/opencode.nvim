@@ -1,6 +1,7 @@
 local M = {}
 
 ---@class opencode.terminal.Opts : vim.api.keyset.win_config
+---@field env? table<string, string> Environment variables to inject into the terminal
 
 local winid
 local bufnr
@@ -21,6 +22,24 @@ function M.toggle(cmd, opts)
   else
     M.open(cmd, opts)
   end
+end
+
+---Merge environment variables with current environment.
+---Preserves existing env vars while allowing overrides.
+---@param env? table<string, string>
+---@return table<string, string>|nil
+local function merge_env(env)
+  if not env or vim.tbl_isempty(env) then
+    return nil
+  end
+  local merged = {}
+  for k, v in pairs(vim.fn.environ()) do
+    merged[k] = v
+  end
+  for k, v in pairs(env) do
+    merged[k] = v
+  end
+  return merged
 end
 
 ---@param cmd string
@@ -48,12 +67,19 @@ function M.open(cmd, opts)
 
   M.setup(winid)
 
-  vim.fn.jobstart(cmd, {
+  local job_opts = {
     term = true,
     on_exit = function()
       M.close()
     end,
-  })
+  }
+
+  local merged_env = merge_env(opts.env)
+  if merged_env then
+    job_opts.env = merged_env
+  end
+
+  vim.fn.jobstart(cmd, job_opts)
 
   vim.api.nvim_set_current_win(previous_win)
 end
