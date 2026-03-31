@@ -38,6 +38,7 @@ end
 function M.get_server_script_path()
   local runtime_files = vim.api.nvim_get_runtime_file("lua/opencode.lua", false)
   if #runtime_files == 0 then
+    vim.notify("OpenCode: could not locate plugin root", vim.log.levels.WARN)
     return ""
   end
   local opencode_lua = runtime_files[1]
@@ -47,6 +48,8 @@ end
 
 ---Internal helper for testing and debugging.
 ---@return string|nil
-M._get_rpc_socket = get_rpc_socket
+function M._get_rpc_socket()
+  return get_rpc_socket()
+end
 
 return M
