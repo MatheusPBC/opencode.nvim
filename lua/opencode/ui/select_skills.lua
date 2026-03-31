@@ -1,0 +1,88 @@
+local M = {}
+
+---Select a skill from locally discovered skills
+---@return Promise
+function M.select()
+  local Promise = require("opencode.promise")
+  
+  -- Get skills synchronously (local filesystem, no HTTP)
+  local ok, skills = pcall(function()
+    return require("opencode.skills").list()
+  end)
+  
+  if not ok then
+    skills = {}
+  end
+  
+  if #skills == 0 then
+    vim.notify("No skills found in local directories", vim.log.levels.INFO, { title = "opencode" })
+    return Promise.reject("No skills available")
+  end
+  
+  ---@class opencode.select_skills.Item : snacks.picker.finder.Item
+  ---@field skill opencode.Skill
+  
+  local items = {}
+  
+  -- Skills are already sorted by name from skills.list()
+  for _, skill in ipairs(skills) do
+    table.insert(items, {
+      skill = skill,
+      name = skill.name,
+      text = skill.description or "",
+      highlights = { { skill.description or "", "Comment" } },
+      preview = {
+        text = string.format(
+          "Skill: %s\n\nSource: %s\nPath: %s\n\n%s",
+          skill.name,
+          skill.source,
+          skill.path,
+          skill.description or "No description"
+        ),
+      },
+    })
+  end
+  
+  ---@type snacks.picker.ui_select.Opts
+  local select_opts = {
+    prompt = "Select Skill: ",
+    format_item = function(item, is_snacks)
+      if is_snacks then
+        local source_highlight = item.source == "project" and "Title" or "Keyword"
+        return {
+          { "[" .. item.source:sub(1, 1):upper() .. "] ", source_highlight },
+          { item.name, "Normal" },
+          { string.rep(" ", 20 - #item.name) },
+          { item.skill.description or "", "Comment" },
+        }
+      else
+        return string.format("[%s] %s%s  %s", item.source:sub(1, 1):upper(), item.name, string.rep(" ", 20 - #item.name), item.skill.description or "")
+      end
+    end,
+  }
+  
+  return Promise.select(items, select_opts)
+    :next(function(choice) ---@param choice opencode.select_skills.Item
+      -- For Part 2: just display info and copy name to clipboard
+      -- Future Part 3: could insert @[skill:...] into input
+      vim.fn.setreg("+", choice.skill.name)
+      vim.notify(
+        string.format("Skill: %s\n\nSource: %s\nPath: %s\n\nName copied to clipboard.\nSkill execution available in Part 3.",
+          choice.name,
+          choice.source,
+          choice.skill.path
+        ),
+        vim.log.levels.INFO,
+        { title = "opencode" }
+      )
+      return choice.skill
+    end)
+    :catch(function(err)
+      if err then
+        -- Error already handled above, just propagate
+      end
+      return Promise.reject(err)
+    end)
+end
+
+return M
