@@ -208,7 +208,7 @@ M.select_skills = function()
 end
 
 ---Select a profile from available profiles.
----Set as global or current project profile on selection.
+---Sets the selected profile as the global profile.
 M.select_profile = function()
   return require("opencode.ui.select_profiles").select():catch(function(err)
     if err then

@@ -1,5 +1,46 @@
 # Changelog
 
+## [Unreleased]
+
+### Fork Features
+
+#### Slash Commands (Part 1)
+
+- **feat**: Add `slash()` API to execute real slash commands via HTTP API
+- **feat**: Auto-detect `/`-prefixed input in `ask()` and route to slash command API
+- **feat**: Add `select_commands()` picker for slash commands
+
+#### Agents Picker (Part 2)
+
+- **feat**: Add `select_agents()` picker for agents from HTTP API
+- **feat**: Agent selection inserts `@AgentName ` in active input or opens pre-filled ask()
+- **feat**: Add agents section to main `select()` menu
+
+#### Skills Picker (Part 2)
+
+- **feat**: Add `select_skills()` picker for locally discovered skills
+- **feat**: Skills discovered from `.opencode/skills/` directories
+- **feat**: Skill selection operates in safe mode (info notification + clipboard)
+- **feat**: Add skills section to main `select()` menu
+
+#### Completion Enhancement (Part 3)
+
+- **feat**: Add slash command completion when input starts with `/`
+- **feat**: Completion triggered by `/` character in ask input
+
+#### Context Profiles (Part 4)
+
+- **feat**: Add profile system for named context presets
+- **feat**: Profile persistence in `stdpath("data")/opencode/profiles.json`
+- **feat**: Global profile + project-specific override with precedence
+- **feat**: Add `select_profile()` picker
+- **feat**: Add profile API: `get_profile()`, `list_profiles()`, `get_profile_contexts()`
+- **feat**: Add profile management: `set_profile_global()`, `set_profile_project()`, `clear_profile_project()`
+- **feat**: Auto-prepend active profile contexts to prompts
+- **feat**: Add profiles section to main `select()` menu
+
+---
+
 ## [0.6.0](https://github.com/nickjvandyke/opencode.nvim/compare/v0.5.2...v0.6.0) (2026-03-29)
 
 

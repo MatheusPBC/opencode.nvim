@@ -5,6 +5,15 @@
 local handlers = {}
 local ms = vim.lsp.protocol.Methods
 
+---@param name string
+---@return string
+local function normalize_slash_command(name)
+  if name:sub(1, 1) == "/" then
+    return name
+  end
+  return "/" .. name
+end
+
 ---@param params lsp.InitializeParams
 ---@param callback fun(err?: lsp.ResponseError, result: lsp.InitializeResult)
 handlers[ms.initialize] = function(params, callback)
@@ -67,6 +76,7 @@ handlers[ms.textDocument_completion] = function(params, callback)
   local agents = connected_server and connected_server.subagents or {}
   for _, agent in ipairs(agents) do
     local label = "@" .. agent.name
+    local agent_description = agent.description or "Agent"
     ---@type lsp.CompletionItem
     local item = {
       label = label,
@@ -76,7 +86,7 @@ handlers[ms.textDocument_completion] = function(params, callback)
       kind = vim.lsp.protocol.CompletionItemKind.Property,
       documentation = {
         kind = "markdown",
-        value = "```" .. agent.description or "Agent" .. "```",
+        value = "```\n" .. agent_description .. "\n```",
       },
     }
     table.insert(items, item)
@@ -93,7 +103,7 @@ handlers[ms.textDocument_completion] = function(params, callback)
     connected_server:get_slash_commands(function(commands) ---@param commands opencode.server.SlashCommand[]
       if commands then
         for _, command in ipairs(commands) do
-          local cmd_label = "/" .. command.name
+          local cmd_label = normalize_slash_command(command.name)
           ---@type lsp.CompletionItem
           local item = {
             label = cmd_label,

@@ -17,6 +17,15 @@ Integrate the [opencode](https://github.com/sst/opencode) AI assistant with Neov
 - _Vim-y_ — supports ranges and dot-repeat
 - Simple, sensible defaults to get you started quickly
 
+### 🆕 Fork Features
+
+- **Slash Commands**: Execute real slash commands (`/agents`, `/new`, etc.) via HTTP API
+- **Agents Picker**: Browse and select agents from the `opencode` server
+- **Skills Picker**: Discover locally available skills from project and global directories
+- **Slash Commands Picker**: Browse and execute slash commands interactively
+- **Context Profiles**: Named sets of default contexts with persistence (global + project-specific)
+- **Completion for Slash Commands**: Auto-complete `/commands` in the input prompt
+
 ## 📦 Setup
 
 ### [lazy.nvim](https://github.com/folke/lazy.nvim)
@@ -73,6 +82,30 @@ Integrate the [opencode](https://github.com/sst/opencode) AI assistant with Neov
   end,
 }
 ```
+
+### Configuration with Profiles
+
+Profiles allow you to define named sets of default contexts that are automatically prepended to prompts:
+
+```lua
+---@type opencode.Opts
+vim.g.opencode_opts = {
+  profiles = {
+    -- Default profile: no automatic contexts
+    default = {},
+    -- Code review profile: automatically include diff and diagnostics
+    code_review = { "@diff", "@diagnostics" },
+    -- Full context profile: include all relevant contexts
+    full = { "@buffer", "@diagnostics", "@diff" },
+  },
+}
+```
+
+**Profile Precedence:**
+1. Explicit profile passed to API
+2. Project-specific override
+3. Global profile
+4. Default (empty contexts)
 
 ### [nixvim](https://github.com/nix-community/nixvim)
 
@@ -201,6 +234,10 @@ Select from all `opencode.nvim` functionality.
 - Prompts
 - Commands
 - Server controls
+- **Agents** (from HTTP API)
+- **Skills** (from local filesystem)
+- **Slash Commands** (from HTTP API)
+- **Profiles** (context presets)
 
 Highlights and previews items when using `snacks.picker`.
 
@@ -211,6 +248,7 @@ Prompt `opencode`.
 - Resolves named references to configured prompts.
 - Injects configured contexts.
 - `opencode` will interpret `@` references to files or subagents.
+- **Auto-prepends active profile contexts** (if configured).
 
 ### Operator — `require("opencode").operator()`
 
@@ -239,6 +277,92 @@ Command `opencode`:
 | `prompt.submit`          | Submit the TUI input                               |
 | `prompt.clear`           | Clear the TUI input                                |
 | `agent.cycle`            | Cycle the selected agent                           |
+
+---
+
+## 🆕 Fork API Reference
+
+### Slash Commands — `require("opencode").slash()`
+
+Execute real slash commands via HTTP API:
+
+```lua
+-- Execute a slash command
+require("opencode").slash("/new")
+require("opencode").slash("/agents", { arg = "value" })
+
+-- Available slash commands depend on your `opencode` configuration
+```
+
+**Note:** Slash commands starting with `/` in the input prompt are automatically detected and routed to this API.
+
+### Agents Picker — `require("opencode").select_agents()`
+
+Browse and select agents from the connected `opencode` server:
+
+```lua
+require("opencode").select_agents()
+-- On selection:
+-- - If input is active: inserts "@AgentName " at cursor
+-- - If input is inactive: opens new input pre-filled with "@AgentName "
+```
+
+### Skills Picker — `require("opencode").select_skills()`
+
+Browse locally discovered skills from project and global directories:
+
+```lua
+require("opencode").select_skills()
+-- On selection: copies skill name to clipboard and shows info notification
+```
+
+**Note:** Skills are discovered from `.opencode/skills/` directories. There is no canonical skill syntax yet — skills currently operate in "safe mode" (info + clipboard).
+
+### Slash Commands Picker — `require("opencode").select_commands()`
+
+Browse and execute slash commands interactively:
+
+```lua
+require("opencode").select_commands()
+-- On selection: executes the selected slash command
+```
+
+### Profiles API — Context Presets
+
+Manage context profiles with persistence:
+
+```lua
+local opencode = require("opencode")
+
+-- Open profile picker
+opencode.select_profile()
+
+-- Get current active profile (resolved with precedence)
+opencode.get_profile()
+
+-- Get list of available profile names
+opencode.list_profiles()
+
+-- Get contexts for a specific profile
+opencode.get_profile_contexts("code_review")
+
+-- Set global profile (persists across sessions)
+opencode.set_profile_global("code_review")
+
+-- Set project-specific profile override
+opencode.set_profile_project("full")
+
+-- Clear project override (falls back to global)
+opencode.clear_profile_project()
+```
+
+**Profile Resolution Precedence:**
+1. Explicit profile passed to API
+2. Project-specific override
+3. Global profile
+4. Default (no contexts)
+
+**Persistence:** Profile settings are stored in `stdpath("data")/opencode/profiles.json`.
 
 ### LSP
 
@@ -316,3 +440,89 @@ require("lualine").setup({
 - Inspired by [nvim-aider](https://github.com/GeorgesAlkhouri/nvim-aider), [neopencode.nvim](https://github.com/loukotal/neopencode.nvim), and [sidekick.nvim](https://github.com/folke/sidekick.nvim).
 - Uses `opencode`'s TUI for simplicity — see [sudo-tee/opencode.nvim](https://github.com/sudo-tee/opencode.nvim) for a Neovim frontend.
 - [mcp-neovim-server](https://github.com/bigcodegen/mcp-neovim-server) may better suit you, but it lacks customization and tool calls are slow and unreliable.
+
+---
+
+## ⚠️ Known Limitations
+
+| Feature | Limitation |
+| ------- | ---------- |
+| **Agents** | Inserted as `@AgentName` in input — no canonical skill syntax for automatic invocation |
+| **Skills** | No canonical syntax yet; operates in safe mode (info notification + clipboard) |
+| **Slash Commands** | Only recognized when input starts with `/`; rely on HTTP API |
+| **Profiles** | Project identification uses git root (fallback to cwd); picker selection currently sets the global profile only |
+| **Completion** | Slash command completion requires active `opencode` server connection |
+
+---
+
+## ⌨️ Suggested Keymaps
+
+Add these keymaps to your configuration for quick access to fork features:
+
+```lua
+local opencode = require("opencode")
+
+-- Main menu (includes all pickers)
+vim.keymap.set("n", "<leader>o", function() opencode.select() end, { desc = "opencode: Main menu" })
+
+-- Fork-specific pickers
+vim.keymap.set("n", "<leader>oa", function() opencode.select_agents() end, { desc = "opencode: Select agent" })
+vim.keymap.set("n", "<leader>os", function() opencode.select_skills() end, { desc = "opencode: Select skill" })
+vim.keymap.set("n", "<leader>oc", function() opencode.select_commands() end, { desc = "opencode: Select slash command" })
+vim.keymap.set("n", "<leader>op", function() opencode.select_profile() end, { desc = "opencode: Select profile" })
+
+-- Profile management
+vim.keymap.set("n", "<leader>opg", function() opencode.set_profile_global("code_review") end, { desc = "opencode: Set global profile to 'code_review'" })
+vim.keymap.set("n", "<leader>opp", function() opencode.set_profile_project("full") end, { desc = "opencode: Set project profile to 'full'" })
+vim.keymap.set("n", "<leader>opc", function() opencode.clear_profile_project() end, { desc = "opencode: Clear project profile override" })
+
+-- Quick slash commands
+vim.keymap.set("n", "<leader>on", function() opencode.slash("/new") end, { desc = "opencode: New session" })
+vim.keymap.set("n", "<leader>oA", function() opencode.slash("/agents") end, { desc = "opencode: List agents" })
+```
+
+---
+
+## 🧪 Smoke Tests / Manual Checklist
+
+Use this checklist to verify functionality after setup:
+
+### Basic Functionality
+- [ ] `:lua require("opencode").ask()` opens input prompt
+- [ ] `:lua require("opencode").select()` opens main menu
+- [ ] `:lua require("opencode").toggle()` toggles opencode terminal
+
+### Slash Commands
+- [ ] `:lua require("opencode").slash("/new")` executes slash command
+- [ ] `:lua require("opencode").select_commands()` opens slash command picker
+- [ ] Typing `/new` in ask prompt routes to slash command API
+
+### Agents
+- [ ] `:lua require("opencode").select_agents()` opens agents picker
+- [ ] Selecting agent with active input inserts `@AgentName `
+- [ ] Selecting agent without active input opens pre-filled ask()
+
+### Skills
+- [ ] `:lua require("opencode").select_skills()` opens skills picker
+- [ ] Selecting skill shows info notification
+- [ ] Skill name copied to clipboard
+
+### Profiles
+- [ ] `:lua require("opencode").select_profile()` opens profile picker
+- [ ] `:lua require("opencode").list_profiles()` returns table of profile names
+- [ ] `:lua require("opencode").get_profile()` returns active profile name
+- [ ] Setting global profile persists across Neovim restarts
+- [ ] Setting project profile persists across Neovim restarts
+- [ ] Project profile takes precedence over global profile
+- [ ] Clearing project override falls back to global profile
+
+### Completion
+- [ ] Context placeholders (`@buffer`, `@this`, etc.) appear in completion
+- [ ] Agent names (`@AgentName`) appear in completion
+- [ ] Slash commands (`/new`, `/agents`) appear when typing `/` in input
+
+---
+
+## 📝 Changelog
+
+See [CHANGELOG.md](./CHANGELOG.md) for release history.

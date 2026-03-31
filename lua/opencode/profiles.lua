@@ -9,7 +9,7 @@ local config = require("opencode.config")
 ---@return string
 function M.get_project_key()
   -- Try git root first
-  local git_root = vim.fs.root(".git")
+  local git_root = vim.fs.root(vim.fn.getcwd(), ".git")
   if git_root then
     return git_root
   end

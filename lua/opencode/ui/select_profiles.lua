@@ -51,7 +51,7 @@ function M.select()
       highlights = { { description, "Comment" } },
       preview = {
         text = string.format(
-          "Profile: %s\n\nContexts:\n%s\n\nActions:\n- <CR> Set as global profile\n- <C-p> Set as project profile override\n- <C-x> Clear project override",
+          "Profile: %s\n\nContexts:\n%s\n\nAction:\n- <CR> Set as global profile\n\nUse `set_profile_project()` or `clear_profile_project()` for project overrides.",
           profile_name,
           #contexts > 0 and "  " .. table.concat(contexts, "\n  ") or "  (none)"
         ),
