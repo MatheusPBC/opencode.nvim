@@ -207,6 +207,52 @@ M.select_skills = function()
   end)
 end
 
+---Select a profile from available profiles.
+---Set as global or current project profile on selection.
+M.select_profile = function()
+  return require("opencode.ui.select_profiles").select():catch(function(err)
+    if err then
+      vim.notify(err, vim.log.levels.ERROR, { title = "opencode" })
+    end
+  end)
+end
+
+---Get the currently active profile name (resolved with precedence).
+---@return string
+M.get_profile = function()
+  return require("opencode.profiles").get_active_profile()
+end
+
+---Set the global profile.
+---@param name string Profile name
+M.set_profile_global = function(name)
+  require("opencode.profiles").set_global_profile(name)
+end
+
+---Set the profile override for the current project.
+---@param name string Profile name
+M.set_profile_project = function(name)
+  require("opencode.profiles").set_project_profile(name)
+end
+
+---Clear the profile override for the current project.
+M.clear_profile_project = function()
+  require("opencode.profiles").clear_project_profile()
+end
+
+---Get list of available profile names.
+---@return string[]
+M.list_profiles = function()
+  return require("opencode.profiles").list_profiles()
+end
+
+---Get contexts for a specific profile.
+---@param name string Profile name
+---@return string[]
+M.get_profile_contexts = function(name)
+  return require("opencode.profiles").get_contexts(name)
+end
+
 ---Select and execute a slash command (from HTTP API).
 M.select_commands = function()
   return require("opencode.ui.select_commands").select():catch(function(err)
