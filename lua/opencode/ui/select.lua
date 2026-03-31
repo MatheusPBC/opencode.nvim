@@ -17,6 +17,15 @@ local M = {}
 ---@field commands? table<opencode.Command|string, string>|false
 ---
 ---@field server? boolean Whether to show server controls.
+---
+---Whether to show the agents section (from HTTP API).
+---@field agents? boolean
+---
+---Whether to show the skills section (from local filesystem).
+---@field skills? boolean
+---
+---Whether to show the slash commands section (from HTTP API).
+---@field slash_commands? boolean
 
 ---Select from all `opencode.nvim` functionality.
 ---
@@ -35,7 +44,7 @@ function M.select(opts)
       local prompts = require("opencode.config").opts.prompts or {}
       local commands = require("opencode.config").opts.select.sections.commands or {}
 
-      ---@class opencode.select.Item : snacks.picker.finder.Item, { __type: "prompt" | "command" | "server", ask?: boolean, submit?: boolean }
+      ---@class opencode.select.Item : snacks.picker.finder.Item, { __type: "prompt" | "command" | "server" | "agent" | "skill" | "slash_command", ask?: boolean, submit?: boolean }
       local items = {}
 
       -- Prompts section
@@ -99,6 +108,42 @@ function M.select(opts)
         for _, item in ipairs(command_items) do
           table.insert(items, item)
         end
+      end
+
+      -- Agents section
+      if opts.sections.agents then
+        table.insert(items, { __group = true, name = "AGENTS", preview = { text = "" } })
+        table.insert(items, {
+          __type = "agent",
+          name = "agents.select",
+          text = "Select an agent",
+          highlights = { { "Select an agent", "Comment" } },
+          preview = { text = "Browse and select from available agents (primary and subagents)" },
+        })
+      end
+
+      -- Skills section
+      if opts.sections.skills then
+        table.insert(items, { __group = true, name = "SKILLS", preview = { text = "" } })
+        table.insert(items, {
+          __type = "skill",
+          name = "skills.select",
+          text = "Select a skill",
+          highlights = { { "Select a skill", "Comment" } },
+          preview = { text = "Browse locally discovered skills from project and global directories" },
+        })
+      end
+
+      -- Slash Commands section
+      if opts.sections.slash_commands then
+        table.insert(items, { __group = true, name = "COMMANDS", preview = { text = "" } })
+        table.insert(items, {
+          __type = "slash_command",
+          name = "commands.select",
+          text = "Select a slash command",
+          highlights = { { "Select a slash command", "Comment" } },
+          preview = { text = "Browse and execute slash commands (/agents, /new, etc.)" },
+        })
       end
 
       -- Server section
@@ -199,6 +244,12 @@ function M.select(opts)
         elseif choice.name == "server.toggle" then
           return require("opencode").toggle()
         end
+      elseif choice.__type == "agent" then
+        return require("opencode").select_agents()
+      elseif choice.__type == "skill" then
+        return require("opencode").select_skills()
+      elseif choice.__type == "slash_command" then
+        return require("opencode").select_commands()
       else
         return Promise.reject("Unknown item: " .. choice.name)
       end
