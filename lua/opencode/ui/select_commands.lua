@@ -1,7 +1,7 @@
 local M = {}
 
 ---Select a slash command from available commands via HTTP API
----@return Promise
+---@return Promise<void>
 function M.select()
   local Promise = require("opencode.promise")
   local Server = require("opencode.server")
