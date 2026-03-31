@@ -69,7 +69,7 @@ function M.select()
       vim.notify(
         string.format("Skill: %s\n\nSource: %s\nPath: %s\n\nName copied to clipboard.\nSkill execution available in Part 3.",
           choice.name,
-          choice.source,
+          choice.skill.source,
           choice.skill.path
         ),
         vim.log.levels.INFO,
