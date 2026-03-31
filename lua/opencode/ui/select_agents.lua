@@ -1,7 +1,7 @@
 local M = {}
 
 ---Select an agent from available agents via HTTP API
----@return Promise
+---@return Promise<opencode.server.Agent>
 function M.select()
   local Promise = require("opencode.promise")
   local Server = require("opencode.server")
@@ -57,7 +57,7 @@ function M.select()
             return {
               { item.name, mode_highlight },
               { string.rep(" ", 20 - #item.name) },
-              { item.description or "", "Comment" },
+              { item.agent.description or "", "Comment" },
             }
           else
             local mode_indicator = item.agent.mode == "primary" and "[P]" or "[S]"
