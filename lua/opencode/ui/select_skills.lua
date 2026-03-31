@@ -79,7 +79,7 @@ function M.select()
     end)
     :catch(function(err)
       if err then
-        -- Error already handled above, just propagate
+        vim.notify(err, vim.log.levels.WARN, { title = "opencode" })
       end
       return Promise.reject(err)
     end)
