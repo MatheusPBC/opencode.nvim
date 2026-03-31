@@ -10,7 +10,7 @@ local ms = vim.lsp.protocol.Methods
 handlers[ms.initialize] = function(params, callback)
   local config = require("opencode.config")
   -- Parse `opts.context` to return all non-alphanumeric first characters in placeholders
-  local trigger_chars = {}
+  local trigger_chars = { "/" }
   for placeholder, _ in pairs(config.opts.contexts or {}) do
     local first_char = placeholder:sub(1, 1)
     if not first_char:match("%w") and not vim.tbl_contains(trigger_chars, first_char) then
@@ -36,6 +36,21 @@ end
 handlers[ms.textDocument_completion] = function(params, callback)
   local items = {}
   local config = require("opencode.config")
+  local connected_server = require("opencode.events").connected_server
+
+  local text_document = params.textDocument
+  local uri = text_document and text_document.uri
+  local line = params.position and params.position.line or 0
+  local character = params.position and params.position.character or 0
+
+  local doccontent = vim.lsp.util.get_line_content({ uri = uri, line = line })
+  local linecontent = ""
+  if type(doccontent) == "string" then
+    linecontent = doccontent
+  end
+
+  local text_before_cursor = linecontent:sub(1, character)
+  local starts_with_slash = text_before_cursor:match("^%s*/$") or text_before_cursor:match("^%s*/[^%s]*$")
 
   for placeholder, _ in pairs(config.opts.contexts or {}) do
     ---@type lsp.CompletionItem
@@ -49,7 +64,6 @@ handlers[ms.textDocument_completion] = function(params, callback)
     table.insert(items, item)
   end
 
-  local connected_server = require("opencode.events").connected_server
   local agents = connected_server and connected_server.subagents or {}
   for _, agent in ipairs(agents) do
     local label = "@" .. agent.name
@@ -68,7 +82,39 @@ handlers[ms.textDocument_completion] = function(params, callback)
     table.insert(items, item)
   end
 
-  callback(nil, items)
+  if starts_with_slash and connected_server then
+    local called = false
+    local function done()
+      if not called then
+        called = true
+        callback(nil, items)
+      end
+    end
+    connected_server:get_slash_commands(function(commands) ---@param commands opencode.server.SlashCommand[]
+      if commands then
+        for _, command in ipairs(commands) do
+          local cmd_label = "/" .. command.name
+          ---@type lsp.CompletionItem
+          local item = {
+            label = cmd_label,
+            filterText = cmd_label,
+            insertText = cmd_label,
+            insertTextFormat = vim.lsp.protocol.InsertTextFormat.PlainText,
+            kind = vim.lsp.protocol.CompletionItemKind.Command,
+            documentation = {
+              kind = "markdown",
+              value = command.description or "Slash command",
+            },
+          }
+          table.insert(items, item)
+        end
+      end
+      done()
+    end)
+    vim.defer_fn(done, 1000)
+  else
+    callback(nil, items)
+  end
 end
 
 ---@param params lsp.CompletionItem

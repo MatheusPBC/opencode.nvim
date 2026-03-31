@@ -228,6 +228,86 @@ function Server:get_commands(callback)
   return self:curl("/command", "GET", nil, callback)
 end
 
+---@class opencode.server.SlashCommand
+---@field name string
+---@field description string
+
+---Get all available slash commands from `opencode`.
+---
+---@param callback fun(commands: opencode.server.SlashCommand[])
+function Server:get_slash_commands(callback)
+  return self:curl("/command", "GET", nil, callback)
+end
+
+---@class opencode.server.SessionStatus
+---@field state string "active"|"idle"
+---@field lastActivity? string
+
+---Get the active session for this server.
+---Returns the session with state "active", or falls back to the most recently updated session.
+---
+---@param callback fun(session: opencode.server.Session|nil)
+function Server:get_active_session(callback)
+  local Promise = require("opencode.promise")
+
+  Promise.all({
+    Promise.new(function(resolve)
+      self:get_sessions(function(sessions)
+        resolve(sessions)
+      end)
+    end),
+    Promise.new(function(resolve)
+      self:get_sessions_status(function(statuses)
+        resolve(statuses)
+      end)
+    end),
+  })
+    :next(function(results) ---@param results { [1]: opencode.server.Session[], [2]: table<string, opencode.server.SessionStatus> }
+      local sessions = results[1]
+      local statuses = results[2]
+
+      for _, session in ipairs(sessions) do
+        local status = statuses[session.id]
+        if status and status.state == "active" then
+          callback(session)
+          return
+        end
+      end
+
+      if #sessions > 0 then
+        table.sort(sessions, function(a, b)
+          return a.time.updated > b.time.updated
+        end)
+        callback(sessions[1])
+      else
+        callback(nil)
+      end
+    end)
+    :catch(function()
+      callback(nil)
+    end)
+end
+
+---@class opencode.server.SlashCommandOpts
+---@field messageID? string
+---@field agent? string
+---@field model? string
+
+---Execute a slash command in a session.
+---
+---@param session_id string
+---@param command string The slash command name (e.g., "/agents", "/new")
+---@param args? table<string, any> Arguments for the command
+---@param opts? opencode.server.SlashCommandOpts
+---@param callback fun(response: table)|nil
+function Server:execute_slash_command(session_id, command, args, opts, callback)
+  local body = vim.tbl_extend("force", {
+    command = command,
+    arguments = args or {},
+  }, opts or {})
+  return self:curl("/session/" .. session_id .. "/command", "POST", body, callback)
+end
+
 ---@class opencode.server.SessionTime
 ---@field created integer time in milliseconds
 ---@field updated integer time in milliseconds

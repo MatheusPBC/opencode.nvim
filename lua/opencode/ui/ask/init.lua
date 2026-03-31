@@ -10,6 +10,70 @@ local M = {}
 ---Options for [`snacks.input`](https://github.com/folke/snacks.nvim/blob/main/docs/input.md).
 ---@field snacks? snacks.input.Opts
 
+local active_input_buf = nil
+local active_input_win = nil
+
+---Check if a snacks.input is currently active.
+---@return boolean
+function M.is_active()
+  return active_input_buf ~= nil and vim.api.nvim_buf_is_valid(active_input_buf)
+end
+
+---Get the buffer number of the active input, if any.
+---@return integer|nil
+function M.get_buffer()
+  if M.is_active() then
+    return active_input_buf
+  end
+  return nil
+end
+
+---Insert text at the cursor position in the active input.
+---Returns true if successful, false if no active input.
+---@param text string
+---@return boolean
+function M.insert_text(text)
+  if not M.is_active() then
+    return false
+  end
+
+  local buf = active_input_buf
+  local win = active_input_win
+
+  if not win or not vim.api.nvim_win_is_valid(win) then
+    return false
+  end
+
+  local cursor = vim.api.nvim_win_get_cursor(win)
+  local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+
+  if #lines == 0 then
+    lines = { "" }
+  end
+
+  local line = lines[cursor[1]] or ""
+  local col = cursor[2]
+
+  local new_line = line:sub(1, col) .. text .. line:sub(col + 1)
+  lines[cursor[1]] = new_line
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+
+  vim.api.nvim_win_set_cursor(win, { cursor[1], col + #text })
+
+  return true
+end
+
+---Open a new ask prompt with text pre-filled.
+---@param text string Text to pre-fill.
+---@param opts? opencode.ask.Opts
+---@return Promise<string>
+function M.ask_prefilled(text, opts)
+  opts = opts or {}
+  opts.prompt = text
+  local context = require("opencode.context").new()
+  return M.ask(text, context)
+end
+
 ---Prompt for input with `vim.ui.input`, with context- and server-aware completion.
 ---
 ---@param default? string Text to pre-fill the input with.
@@ -34,7 +98,58 @@ function M.ask(default, context)
       input_opts = vim.tbl_deep_extend("force", input_opts, require("opencode.config").opts.ask)
       input_opts = vim.tbl_deep_extend("force", input_opts, require("opencode.config").opts.ask.snacks)
 
-      return Promise.input(input_opts)
+      local original_on_submit = input_opts.on_submit
+      input_opts.on_submit = function(value, opts_inner)
+        active_input_buf = nil
+        active_input_win = nil
+        if original_on_submit then
+          original_on_submit(value, opts_inner)
+        end
+      end
+
+      local original_on_cancel = input_opts.on_cancel
+      input_opts.on_cancel = function(opts_inner)
+        active_input_buf = nil
+        active_input_win = nil
+        if original_on_cancel then
+          original_on_cancel(opts_inner)
+        end
+      end
+
+      return Promise.new(function(resolve, reject)
+        Promise.input(input_opts)
+          :next(function(result)
+            resolve(result)
+          end)
+          :catch(function(err)
+            reject(err)
+          end)
+
+        vim.schedule(function()
+          for _, win in ipairs(vim.api.nvim_list_wins()) do
+            local buf = vim.api.nvim_win_get_buf(win)
+            local bufname = vim.api.nvim_buf_get_name(buf)
+            if bufname:match("snacks%.input") or vim.b[buf].snacks_input then
+              active_input_buf = buf
+              active_input_win = win
+              break
+            end
+          end
+
+          if not active_input_buf then
+            for _, win in ipairs(vim.api.nvim_list_wins()) do
+              local buf = vim.api.nvim_win_get_buf(win)
+              local ft = vim.api.nvim_get_option_value("filetype", { buf = buf })
+              local bt = vim.api.nvim_get_option_value("buftype", { buf = buf })
+              if ft == "snacks_input" or bt == "prompt" then
+                active_input_buf = buf
+                active_input_win = win
+                break
+              end
+            end
+          end
+        end)
+      end)
     end)
     :catch(function(err)
       context:resume()

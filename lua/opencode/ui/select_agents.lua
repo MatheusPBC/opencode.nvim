@@ -69,13 +69,29 @@ function M.select()
       return Promise.select(items, select_opts)
     end)
     :next(function(choice) ---@param choice opencode.select_agents.Item
-      -- For Part 2: just display info, no automatic action
-      -- Future Part 3: could set agent or inject context
-      vim.notify(
-        string.format("Agent selected: %s\n\n%s", choice.agent.name, choice.agent.description or "No description"),
-        vim.log.levels.INFO,
-        { title = "opencode" }
-      )
+      local ask = require("opencode.ui.ask")
+      local agent_ref = "@" .. choice.agent.name .. " "
+
+      if ask.is_active() then
+        ask.insert_text(agent_ref)
+        vim.notify(
+          string.format("Inserted: %s\n\n%s", agent_ref:sub(1, -2), choice.agent.description or "No description"),
+          vim.log.levels.INFO,
+          { title = "opencode" }
+        )
+      else
+        ask.ask_prefilled(agent_ref, { context = require("opencode.context").new() })
+          :next(function(input)
+            if input and input:match("^@" .. choice.agent.name) then
+              vim.notify(
+                string.format("Agent: %s\n\n%s", choice.agent.name, choice.agent.description or "No description"),
+                vim.log.levels.INFO,
+                { title = "opencode" }
+              )
+            end
+          end)
+      end
+
       return choice.agent
     end)
     :catch(function(err)

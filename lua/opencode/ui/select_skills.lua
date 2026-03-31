@@ -63,14 +63,12 @@ function M.select()
   
   return Promise.select(items, select_opts)
     :next(function(choice) ---@param choice opencode.select_skills.Item
-      -- For Part 2: just display info and copy name to clipboard
-      -- Future Part 3: could insert @[skill:...] into input
       vim.fn.setreg("+", choice.skill.name)
       vim.notify(
-        string.format("Skill: %s\n\nSource: %s\nPath: %s\n\nName copied to clipboard.\nSkill execution available in Part 3.",
+        string.format("Skill: %s\n\nSource: %s\nDescription: %s\n\nSkill name copied to clipboard.\nUse in prompts when skill syntax is defined.",
           choice.name,
           choice.skill.source,
-          choice.skill.path
+          choice.skill.description or "No description"
         ),
         vim.log.levels.INFO,
         { title = "opencode" }
