@@ -48,15 +48,15 @@ function M.select()
     prompt = "Select Skill: ",
     format_item = function(item, is_snacks)
       if is_snacks then
-        local source_highlight = item.source == "project" and "Title" or "Keyword"
+        local source_highlight = item.skill.source == "project" and "Title" or "Keyword"
         return {
-          { "[" .. item.source:sub(1, 1):upper() .. "] ", source_highlight },
+          { "[" .. item.skill.source:sub(1, 1):upper() .. "] ", source_highlight },
           { item.name, "Normal" },
           { string.rep(" ", 20 - #item.name) },
           { item.skill.description or "", "Comment" },
         }
       else
-        return string.format("[%s] %s%s  %s", item.source:sub(1, 1):upper(), item.name, string.rep(" ", 20 - #item.name), item.skill.description or "")
+        return string.format("[%s] %s%s  %s", item.skill.source:sub(1, 1):upper(), item.name, string.rep(" ", 20 - #item.name), item.skill.description or "")
       end
     end,
   }
