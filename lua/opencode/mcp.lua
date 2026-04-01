@@ -43,7 +43,7 @@ function M.get_server_script_path()
   end
   local opencode_lua = runtime_files[1]
   local plugin_root = opencode_lua:gsub("/lua/opencode%.lua$", "")
-  return plugin_root .. "/scripts/neovim-mcp.py"
+  return plugin_root .. "/scripts/mcp/opencode_nvim_mcp.lua"
 end
 
 ---Internal helper for testing and debugging.
