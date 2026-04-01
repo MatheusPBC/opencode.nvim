@@ -12,6 +12,8 @@
 ---- Constants
 local ENV_SOCKET = "OPENCODE_NVIM_RPC"
 local CONTENT_LENGTH_PATTERN = "^Content%-Length:%s*(%d+)"
+local MAX_MESSAGE_SIZE = 10 * 1024 * 1024 -- 10MB max message size
+local MAX_CANDIDATES = 100 -- Maximum candidates in picker
 
 ---- State
 local socket_path = nil
@@ -111,6 +113,46 @@ local function decode_response(data)
   return { id = decoded[2], result = decoded[3], error = decoded[4] }, nil
 end
 
+---Validate tool arguments for security
+local function validate_tool_call(tool_name, tool_args)
+  if tool_name == "open_file" then
+    if not tool_args.path or type(tool_args.path) ~= "string" then
+      return nil, { code = -32602, message = "Invalid params: path must be a non-empty string" }
+    end
+    if tool_args.path == "" then
+      return nil, { code = -32602, message = "Invalid params: path must be non-empty" }
+    end
+    if tool_args.line and (type(tool_args.line) ~= "number" or tool_args.line < 1 or tool_args.line ~= math.floor(tool_args.line)) then
+      return nil, { code = -32602, message = "Invalid params: line must be positive integer" }
+    end
+    if tool_args.col and (type(tool_args.col) ~= "number" or tool_args.col < 1 or tool_args.col ~= math.floor(tool_args.col)) then
+      return nil, { code = -32602, message = "Invalid params: col must be positive integer" }
+    end
+  end
+  
+  if tool_name == "open_candidates" then
+    if not tool_args.candidates or type(tool_args.candidates) ~= "table" then
+      return nil, { code = -32602, message = "Invalid params: candidates must be an array" }
+    end
+    if #tool_args.candidates > MAX_CANDIDATES then
+      return nil, { code = -32602, message = "Invalid params: too many candidates (max " .. MAX_CANDIDATES .. ")" }
+    end
+    for i, candidate in ipairs(tool_args.candidates) do
+      if not candidate.path or type(candidate.path) ~= "string" or candidate.path == "" then
+        return nil, { code = -32602, message = "Invalid params: candidates[" .. i .. "].path must be non-empty string" }
+      end
+      if candidate.line and (type(candidate.line) ~= "number" or candidate.line < 1 or candidate.line ~= math.floor(candidate.line)) then
+        return nil, { code = -32602, message = "Invalid params: candidates[" .. i .. "].line must be positive integer" }
+      end
+      if candidate.col and (type(candidate.col) ~= "number" or candidate.col < 1 or candidate.col ~= math.floor(candidate.col)) then
+        return nil, { code = -32602, message = "Invalid params: candidates[" .. i .. "].col must be positive integer" }
+      end
+    end
+  end
+  
+  return true, nil
+end
+
 ---- JSON-RPC Response
 
 ---Send JSON-RPC response to stdout
@@ -178,7 +220,6 @@ end
 local function validate_socket(client, callback)
   local request_id = 1
   local msg = encode_request(request_id, "nvim_get_api_info", {})
-  
   local response_data = {}
   local timer = vim.loop.new_timer()
   
@@ -262,23 +303,28 @@ local function handle_tools_call(id, params)
     return
   end
   
+  -- Validate arguments
+  local valid, validation_err = validate_tool_call(tool_name, tool_args)
+  if not valid then
+    send_error(id, validation_err.code, validation_err.message)
+    return
+  end
+  
   if not socket_client then
     send_error(id, -32429, "socket not connected")
     return
   end
   
-  -- Build Lua code for parent Neovim
+  -- Build Lua code for parent Neovim using safe JSON encoding
+  -- This prevents Lua injection by passing args as JSON and decoding them in the parent
+  local args_json = vim.json.encode(tool_args)
+  -- Escape ]=] sequence to prevent breaking the long bracket
+  local args_json_escaped = args_json:gsub("]=", "]=] =")
   local lua_code
   if tool_name == "open_file" then
-    lua_code = string.format(
-      [[local ok, mod = pcall(require, "opencode.editor_actions"); if ok then mod.open_file(%s) end]],
-      vim.inspect(tool_args)
-    )
+    lua_code = "local args = vim.json.decode([=[" .. args_json_escaped .. "]=]); local ok, mod = pcall(require, 'opencode.editor_actions'); if ok then mod.open_file(args) end"
   else -- open_candidates
-    lua_code = string.format(
-      [[local ok, mod = pcall(require, "opencode.editor_actions"); if ok then mod.open_candidates(%s) end]],
-      vim.inspect(tool_args)
-    )
+    lua_code = "local args = vim.json.decode([=[" .. args_json_escaped .. "]=]); local ok, mod = pcall(require, 'opencode.editor_actions'); if ok then mod.open_candidates(args) end"
   end
   
   -- Fire-and-forget notification to parent Neovim
@@ -427,6 +473,13 @@ local function main()
         end
         
         pending_buffer = pending_buffer .. data
+        
+        -- Check max message size to prevent memory exhaustion
+        if #pending_buffer > MAX_MESSAGE_SIZE then
+          send_error(nil, -32603, "message too large (max " .. math.floor(MAX_MESSAGE_SIZE / 1024 / 1024) .. "MB)")
+          pending_buffer = ""
+          return
+        end
         
         -- Process all complete messages
         local body
