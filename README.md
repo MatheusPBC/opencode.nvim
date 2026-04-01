@@ -483,6 +483,149 @@ vim.keymap.set("n", "<leader>oA", function() opencode.slash("/agents") end, { de
 
 ---
 
+## 🔌 OpenCode MCP Integration
+
+OpenCode is a **terminal-first AI coding agent** that can connect to external tools via MCP (Model Context Protocol). This plugin provides an MCP server that allows OpenCode to control Neovim directly.
+
+### Overview
+
+When you run OpenCode inside Neovim's terminal, the plugin can:
+1. **Automatically inject** the `OPENCODE_NVIM_RPC` environment variable with Neovim's RPC socket path
+2. **Register the MCP server** script with OpenCode so it can send commands back to your editor
+
+This creates a **terminal-first workflow** where OpenCode runs in Neovim's terminal but can still open files, navigate to specific locations, and show pickers when the AI needs user input.
+
+### How It Works
+
+```
+┌─────────────────────┐
+│  Neovim             │
+│  ┌───────────────┐  │
+│  │ opencode.nvim │  │
+│  │  (plugin)     │  │
+│  └───────┬───────┘  │
+│          │ RPC      │
+│          ▼          │
+│  ┌───────────────┐  │
+│  │ MCP Server    │◄────── stdio (JSON-RPC)
+│  │ (script)       │  │
+│  └───────────────┘  │
+└─────────────────────┘
+         ▲
+         │ communicates via
+         │ OPENCODE_NVIM_RPC
+         │
+┌─────────────────────┐
+│  OpenCode TUI       │
+│  (in :terminal)     │
+└─────────────────────┘
+```
+
+### Configuration
+
+Add the MCP server to your OpenCode configuration (`opencode.json`):
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "opencode-nvim": {
+      "type": "local",
+      "command": ["nvim", "--headless", "-u", "NONE", "-l", "<SCRIPT_PATH>"],
+      "enabled": true,
+      "environment": {}
+    }
+  }
+}
+```
+
+**Finding the script path:**
+
+1. **From Lua**: Use `require("opencode").mcp_server_script()` to get the absolute path:
+   ```lua
+   :lua print(require("opencode").mcp_server_script())
+   ```
+
+2. **Manual discovery**: The script is located at:
+   ```
+   <plugin-path>/scripts/mcp/opencode_nvim_mcp.lua
+   ```
+
+**Getting the RPC socket:**
+
+If you need the RPC socket path manually:
+```lua
+:lua print(require("opencode").rpc_socket())
+```
+
+### Automatic Injection
+
+When OpenCode is launched from Neovim's terminal (`:terminal opencode`), the plugin automatically:
+1. Detects current Neovim instance's RPC socket
+2. Sets `OPENCODE_NVIM_RPC` environment variable
+3. The MCP server script reads this variable to connect back
+
+**Note:** The environment variable is only set when OpenCode is started from within Neovim's terminal. For external terminals, you'll need to set it manually.
+
+### Available Tools
+
+Once configured, OpenCode can use these MCP tools:
+
+#### `open_file`
+
+Open a single file in Neovim at a specific location.
+
+```json
+{
+  "path": "/absolute/path/to/file.lua",
+  "line": 42,
+  "col": 10
+}
+```
+
+- **Use when:** There's a single, clear target file and explicit intent to open/navigate
+- **Behavior:** Opens file in a new tab, moves cursor to specified line/column
+
+#### `open_candidates`
+
+Show a picker with multiple file candidates.
+
+```json
+{
+  "candidates": [
+    { "path": "/path/to/file1.lua", "label": "Main handler" },
+    { "path": "/path/to/file2.lua", "line": 15, "label": "Helper function" }
+  ],
+  "prompt": "Select a file to open"
+}
+```
+
+- **Use when:** There's ambiguity or multiple reasonable targets
+- **Behavior:** Opens a vim.ui.select picker, user chooses which file to open
+
+### Usage Rule
+
+> **Important:** The AI model should only call these tools when explicitly asked to open files or navigate. They should not be called proactively during regular coding tasks.
+
+### Example Prompts
+
+```
+Open the configuration file at /etc/config.json
+```
+→ OpenCode calls `open_file` directly
+
+```
+Where is the authentication logic? Show me the options.
+```
+→ OpenCode calls `open_candidates` with relevant files
+
+```
+Fix the bug in src/auth.lua at line 50
+```
+→ OpenCode calls `open_file` to show the location
+
+---
+
 ## 🧪 Smoke Tests / Manual Checklist
 
 Use this checklist to verify functionality after setup:
@@ -520,6 +663,13 @@ Use this checklist to verify functionality after setup:
 - [ ] Context placeholders (`@buffer`, `@this`, etc.) appear in completion
 - [ ] Agent names (`@AgentName`) appear in completion
 - [ ] Slash commands (`/new`, `/agents`) appear when typing `/` in input
+
+### MCP Integration
+- [ ] `:lua print(require("opencode").rpc_socket())` prints a valid socket path
+- [ ] `:lua print(require("opencode").mcp_server_script())` prints the script path
+- [ ] MCP script exists at returned path
+- [ ] OpenCode started from Neovim's terminal has `OPENCODE_NVIM_RPC` environment variable set
+- [ ] MCP tools (`open_file`, `open_candidates`) are available in OpenCode when configured
 
 ---
 

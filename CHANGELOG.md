@@ -39,6 +39,16 @@
 - **feat**: Auto-prepend active profile contexts to prompts
 - **feat**: Add profiles section to main `select()` menu
 
+#### MCP Integration (Part 5)
+
+- **feat**: Add MCP server for OpenCode terminal-first integration
+- **feat**: Add `rpc_socket()` API to get Neovim RPC socket path
+- **feat**: Add `mcp_server_script()` API to get MCP script path
+- **feat**: MCP server provides `open_file` tool for single-file navigation
+- **feat**: MCP server provides `open_candidates` tool for multi-file picker
+- **feat**: Automatic `OPENCODE_NVIM_RPC` injection when running OpenCode from terminal
+- **feat**: Security-hardened MCP server with input validation and timeout protection
+
 ---
 
 ## [0.6.0](https://github.com/nickjvandyke/opencode.nvim/compare/v0.5.2...v0.6.0) (2026-03-29)
