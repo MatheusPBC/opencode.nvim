@@ -187,84 +187,30 @@ end
 
 ---Connect to Neovim RPC socket
 local function connect_socket(path, callback)
-  local client = vim.loop.new_tcp()
-  if not client then
-    callback(nil, "failed to create TCP client")
+  local mode = path:sub(1, 1) == "/" and "pipe" or "tcp"
+  local ok, client = pcall(vim.fn.sockconnect, mode, path, { rpc = true })
+  if not ok or client <= 0 then
+    callback(nil, "connection failed: " .. tostring(client))
     return
   end
 
-  local function on_connect(err)
-    if err then
-      client:close()
-      callback(nil, "connection failed: " .. tostring(err))
-      return
-    end
-    callback(client, nil)
-  end
-
-  -- Unix socket (starts with /) or TCP host:port
-  if path:sub(1, 1) == "/" then
-    client:connect(path, on_connect)
-  else
-    local host, port = path:match("^([^:]+):(%d+)$")
-    if host and port then
-      client:connect(host, tonumber(port), on_connect)
-    else
-      client:close()
-      callback(nil, "invalid socket path: " .. path)
-    end
-  end
+  callback(client, nil)
 end
 
 ---Validate socket by calling nvim_get_api_info
 local function validate_socket(client, callback)
-  local request_id = 1
-  local msg = encode_request(request_id, "nvim_get_api_info", {})
-  local response_data = {}
-  local timer = vim.loop.new_timer()
-  
-  -- Timer for timeout
-  timer:start(5000, 0, function()
-    timer:close()
-    callback(nil, "timeout waiting for validation response")
-  end)
-  
-  -- Read handler
-  client:read_start(function(err, data)
-    if err then
-      timer:close()
-      callback(nil, "read error during validation: " .. tostring(err))
-      return
-    end
-    if not data then
-      timer:close()
-      callback(nil, "connection closed during validation")
-      return
-    end
-    
-    table.insert(response_data, data)
-    local concatenated = table.concat(response_data)
-    
-    local decoded, decode_err = decode_response(concatenated)
-    if decoded then
-      timer:close()
-      client:read_stop()
-      if decoded.error then
-        callback(nil, "validation rpc error: " .. vim.inspect(decoded.error))
-      else
-        callback(true, nil)
-      end
-    end
-    -- Partial data - keep reading
-  end)
-  
-  -- Send validation request
-  client:write(msg, function(err)
-    if err then
-      timer:close()
-      callback(nil, "write error during validation: " .. tostring(err))
-    end
-  end)
+  local ok, result = pcall(vim.rpcrequest, client, "nvim_get_api_info")
+  if not ok then
+    callback(nil, "validation rpc error: " .. tostring(result))
+    return
+  end
+
+  if not result then
+    callback(nil, "empty validation response")
+    return
+  end
+
+  callback(true, nil)
 end
 
 ---- MCP Handlers
@@ -328,8 +274,11 @@ local function handle_tools_call(id, params)
   end
   
   -- Fire-and-forget notification to parent Neovim
-  local notification = encode_notification("nvim_exec_lua", { lua_code, {} })
-  socket_client:write(notification)
+  local ok, notify_err = pcall(vim.rpcnotify, socket_client, "nvim_exec_lua", lua_code, {})
+  if not ok then
+    send_error(id, -32429, "failed to notify Neovim: " .. tostring(notify_err))
+    return
+  end
   
   -- Respond immediately
   local result
@@ -466,7 +415,7 @@ local function main()
           stdin_pipe:close()
           stdout_pipe:close()
           if socket_client then
-            socket_client:close()
+            pcall(vim.fn.chanclose, socket_client)
           end
           vim.loop.stop()
           return
@@ -496,7 +445,7 @@ local function main()
           stdin_pipe:close()
           stdout_pipe:close()
           if socket_client then
-            socket_client:close()
+            pcall(vim.fn.chanclose, socket_client)
           end
           vim.loop.stop()
         end
