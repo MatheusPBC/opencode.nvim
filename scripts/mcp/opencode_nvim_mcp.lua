@@ -22,6 +22,7 @@ local stdin_pipe = nil
 local stdout_pipe = nil
 local pending_buffer = ""
 local is_shutting_down = false
+local output_mode = "content_length"
 
 ---- MCP Tool Definitions
 local TOOLS = {
@@ -162,8 +163,13 @@ local function send_response(id, result)
     result = result,
     id = id,
   })
-  local length = #response
-  local msg = "Content-Length: " .. length .. "\r\n\r\n" .. response
+  local msg
+  if output_mode == "raw_json" then
+    msg = response .. "\n"
+  else
+    local length = #response
+    msg = "Content-Length: " .. length .. "\r\n\r\n" .. response
+  end
   vim.loop.write(stdout_pipe, msg)
 end
 
@@ -178,8 +184,13 @@ local function send_error(id, code, message, data)
     error = err,
     id = id,
   })
-  local length = #response
-  local msg = "Content-Length: " .. length .. "\r\n\r\n" .. response
+  local msg
+  if output_mode == "raw_json" then
+    msg = response .. "\n"
+  else
+    local length = #response
+    msg = "Content-Length: " .. length .. "\r\n\r\n" .. response
+  end
   vim.loop.write(stdout_pipe, msg)
 end
 
@@ -335,13 +346,39 @@ end
 
 ---Parse Content-Length headers and extract body
 local function parse_headers(buffer)
-  local pos = buffer:find("\r\n\r\n", 1, true)
+  local pos, separator_len = buffer:find("\r\n\r\n", 1, true), 4
   if not pos then
+    pos, separator_len = buffer:find("\n\n", 1, true), 2
+  end
+  if not pos then
+    local trimmed = vim.trim(buffer)
+    if trimmed ~= "" then
+      local ok = pcall(vim.json.decode, trimmed)
+      if ok then
+        output_mode = "raw_json"
+        return trimmed, ""
+      end
+
+      local newline_pos = buffer:find("\n", 1, true)
+      if newline_pos then
+        local first_line = vim.trim(buffer:sub(1, newline_pos - 1))
+        if first_line ~= "" then
+          local line_ok = pcall(vim.json.decode, first_line)
+          if line_ok then
+            output_mode = "raw_json"
+            return first_line, buffer:sub(newline_pos + 1)
+          end
+        end
+      end
+    end
+
     return nil, buffer -- Need more data
   end
+
+  output_mode = "content_length"
   
   local header_section = buffer:sub(1, pos - 1)
-  local rest = buffer:sub(pos + 4)
+  local rest = buffer:sub(pos + separator_len)
   
   local content_length = nil
   for line in header_section:gmatch("[^\r\n]+") do
