@@ -6,18 +6,29 @@ local M = {}
 local winid
 local bufnr
 
+---Build window options without terminal-only fields.
+---@param opts? opencode.terminal.Opts
+---@return vim.api.keyset.win_config
+local function get_win_opts(opts)
+  opts = opts or {}
+  local win_opts = vim.deepcopy(opts)
+  win_opts.env = nil
+  return win_opts
+end
+
 ---Start if not running, else show/hide the window.
 ---@param cmd string
 ---@param opts? opencode.terminal.Opts
 function M.toggle(cmd, opts)
   opts = opts or {}
+  local win_opts = get_win_opts(opts)
 
   if winid ~= nil and vim.api.nvim_win_is_valid(winid) then
     vim.api.nvim_win_hide(winid)
     winid = nil
   elseif bufnr ~= nil and vim.api.nvim_buf_is_valid(bufnr) then
     local previous_win = vim.api.nvim_get_current_win()
-    winid = vim.api.nvim_open_win(bufnr, true, opts)
+    winid = vim.api.nvim_open_win(bufnr, true, win_opts)
     vim.api.nvim_set_current_win(previous_win)
   else
     M.open(cmd, opts)
@@ -50,10 +61,11 @@ function M.open(cmd, opts)
   end
 
   opts = opts or {}
+  local win_opts = get_win_opts(opts)
 
   local previous_win = vim.api.nvim_get_current_win()
   bufnr = vim.api.nvim_create_buf(false, false)
-  winid = vim.api.nvim_open_win(bufnr, true, opts)
+  winid = vim.api.nvim_open_win(bufnr, true, win_opts)
 
   vim.api.nvim_create_autocmd("ExitPre", {
     once = true,
